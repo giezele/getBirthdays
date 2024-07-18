@@ -1,0 +1,38 @@
+public function getBirthdays(): Response
+    {
+        $users = DB::select('SELECT *,
+                           DATE_ADD(born_at,
+                                    INTERVAL YEAR(CURDATE()) - YEAR(born_at)
+                                        + IF(DAYOFYEAR(CURDATE()) > DAYOFYEAR(born_at), 1, 0)
+                                    YEAR) as `birthday`,
+                           YEAR(CURDATE()) - YEAR(born_at) as age
+                    FROM `users`
+                    WHERE DATE_ADD(born_at,
+                                   INTERVAL YEAR(CURDATE()) - YEAR(born_at)
+                                       + IF(DAYOFYEAR(CURDATE()) - 1 > DAYOFYEAR(born_at), 1, 0)
+                                   YEAR)
+                        BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                      AND `status` = "active"
+                      AND `born_at` IS NOT NULL
+                      AND `deleted_at` IS NULL
+                    ORDER BY `birthday` ASC');
+
+        $users = User::hydrate($users);
+
+        $data = [];
+        foreach ($users as $user) {
+            $today = new Carbon();
+            $date = new Carbon($user->born_at);
+            $data[$date->year($today->year)->format('Y-m-d')]['users'][] = [
+                'name' => $user->name,
+                'age' => $user->age,
+                'date' => $date->format('Y-m-d'),
+                'image_url' => $user->image_url,
+                'id' => $user->id,
+            ];
+        }
+
+        ksort($data);
+
+        return $this->response->array(['birthdays' => $data]);
+    }
